@@ -43,6 +43,25 @@ def get_directory_structure(rootdir, ignore_patterns=None):
         subdir.update({file: None for file in filenames})
     return dir_structure
 
+def build_tree_string(structure, indent=0, numbering=None):
+    """
+    Recursively builds a string representing the folder structure as a numbered list.
+    """
+    if numbering is None:
+        numbering = []
+    
+    tree_string = ""
+    for index, (key, value) in enumerate(structure.items(), start=1):
+        current_numbering = numbering + [index]
+        number_str = ".".join(map(str, current_numbering))
+        
+        tree_string += f"{'    ' * indent}{number_str} {key}/\n" if value is not None else f"{'    ' * indent}{number_str} {key}\n"
+        
+        if value is not None:
+            tree_string += build_tree_string(value, indent + 1, current_numbering)
+    
+    return tree_string
+
 def create_markdown_from_structure(structure, rootdir, markdown_file, numbering=None):
     """
     Recursively writes the folder structure and file contents to the markdown file.
@@ -68,13 +87,13 @@ def create_markdown_from_structure(structure, rootdir, markdown_file, numbering=
                     print(f"Error reading {file_path}: {e}")
                     continue
 
-            markdown_file.write(f"{number_str} {key}\n\n")
+            markdown_file.write(f"## {number_str} {key}\n\n")
             markdown_file.write(f"```{get_file_extension(key)}\n")
             markdown_file.write(content)
             markdown_file.write("\n```\n\n")
         else:
             # It's a directory, write its name and recurse
-            markdown_file.write(f"{number_str} {key}/\n\n")
+            markdown_file.write(f"# {number_str} {key}/\n\n")
             create_markdown_from_structure(value, os.path.join(rootdir, key), markdown_file, current_numbering)
 
 def get_file_extension(filename):

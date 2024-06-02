@@ -1,6 +1,6 @@
 import os
 import argparse
-from utils import get_directory_structure, create_markdown_from_structure, parse_gitignore
+from utils import get_directory_structure, create_markdown_from_structure, parse_gitignore, build_tree_string
 
 def create_markdown_for_directory(rootdir, output_file):
     """
@@ -9,7 +9,14 @@ def create_markdown_for_directory(rootdir, output_file):
     gitignore_path = os.path.join(rootdir, '.gitignore')
     ignore_patterns = parse_gitignore(gitignore_path) if os.path.exists(gitignore_path) else []
     structure = get_directory_structure(rootdir, ignore_patterns)
+    
     with open(output_file, 'w') as markdown_file:
+        # Write the project tree at the beginning of the file
+        tree_string = build_tree_string(structure)
+        markdown_file.write("# Project Tree\n\n")
+        markdown_file.write(f"```\n{tree_string}\n```\n\n")
+        
+        # Write the detailed contents
         create_markdown_from_structure(structure, rootdir, markdown_file)
 
 if __name__ == "__main__":
