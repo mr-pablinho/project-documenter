@@ -74,16 +74,23 @@ def build_tree_string(structure, indent=0, numbering=None):
     
     return tree_string
 
-def create_markdown_from_structure(structure, rootdir, markdown_file, numbering=None):
+def create_markdown_from_structure(structure, rootdir, markdown_file, numbering=None, additional_ignores=None):
     """
     Recursively writes the folder structure and file contents to the markdown file.
     """
     if numbering is None:
         numbering = []
+    if additional_ignores is None:
+        additional_ignores = []
 
     for index, (key, value) in enumerate(structure.items(), start=1):
         current_numbering = numbering + [index]
         number_str = ".".join(map(str, current_numbering))
+
+        # Check if this path should be ignored from documentation
+        relative_path = os.path.relpath(os.path.join(rootdir, key), rootdir)
+        if matches_pattern(relative_path, additional_ignores):
+            continue
 
         if value is None:
             # It's a file, write its content
@@ -106,7 +113,7 @@ def create_markdown_from_structure(structure, rootdir, markdown_file, numbering=
         else:
             # It's a directory, write its name and recurse
             markdown_file.write(f"# {number_str} {key}/\n\n")
-            create_markdown_from_structure(value, os.path.join(rootdir, key), markdown_file, current_numbering)
+            create_markdown_from_structure(value, os.path.join(rootdir, key), markdown_file, current_numbering, additional_ignores)
 
 def get_file_extension(filename):
     """
