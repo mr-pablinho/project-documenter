@@ -9,6 +9,15 @@ def parse_gitignore(gitignore_path):
         patterns = [line.strip() for line in file if line.strip() and not line.startswith('#')]
     return patterns
 
+def matches_pattern(path, patterns):
+    """
+    Checks if the given path matches any of the ignore patterns.
+    """
+    for pattern in patterns:
+        if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, os.path.join('**', pattern)):
+            return True
+    return False
+
 def get_directory_structure(rootdir, ignore_patterns=None):
     """
     Creates a nested dictionary that represents the folder structure of rootdir.
@@ -18,15 +27,18 @@ def get_directory_structure(rootdir, ignore_patterns=None):
     
     dir_structure = {}
     for dirpath, dirnames, filenames in os.walk(rootdir):
-        # Filter out ignored files and directories
-        dirnames[:] = [d for d in dirnames if not any(fnmatch.fnmatch(os.path.join(dirpath, d), pattern) for pattern in ignore_patterns)]
-        filenames = [f for f in filenames if not any(fnmatch.fnmatch(os.path.join(dirpath, f), pattern) for pattern in ignore_patterns)]
-        
         # Get the relative path
-        folder = os.path.relpath(dirpath, rootdir)
+        relative_dir = os.path.relpath(dirpath, rootdir)
+        
+        # Filter out hidden directories and ignored directories
+        dirnames[:] = [d for d in dirnames if not d.startswith('.') and not matches_pattern(os.path.join(relative_dir, d), ignore_patterns)]
+        # Filter out hidden files and ignored files
+        filenames = [f for f in filenames if not f.startswith('.') and not matches_pattern(os.path.join(relative_dir, f), ignore_patterns)]
+        
+        # Build the directory structure
         subdir = dir_structure
-        if folder != ".":
-            for part in folder.split(os.sep):
+        if relative_dir != ".":
+            for part in relative_dir.split(os.sep):
                 subdir = subdir.setdefault(part, {})
         subdir.update({file: None for file in filenames})
     return dir_structure
@@ -39,8 +51,17 @@ def create_markdown_from_structure(structure, rootdir, markdown_file, indent=0):
         if value is None:
             # It's a file, write its content
             file_path = os.path.join(rootdir, key)
-            with open(file_path, 'r') as file:
-                content = file.read()
+            try:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+            except UnicodeDecodeError:
+                try:
+                    with open(file_path, 'r', encoding='latin-1') as file:
+                        content = file.read()
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
+                    continue
+
             markdown_file.write(f"{'    ' * indent}- {key}\n\n")
             markdown_file.write(f"```{get_file_extension(key)}\n")
             markdown_file.write(content)
