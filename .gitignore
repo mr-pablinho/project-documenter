@@ -5,6 +5,8 @@
 # Ignore virtual environment
 venv/
 .venv/
+venv
+.venv
 
 # Ignore environment configuration
 .env
@@ -32,3 +34,10 @@ secrets.txt
 # Ignore temporary files
 *.tmp
 *.bak
+
+# Ignore python cache
+__pycache__/
+__pycache__
+*.pyc
+*.pyo
+*.pyd
