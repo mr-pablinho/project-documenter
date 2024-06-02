@@ -14,8 +14,20 @@ def matches_pattern(path, patterns):
     Checks if the given path matches any of the ignore patterns.
     """
     for pattern in patterns:
-        if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, os.path.join('**', pattern)):
-            return True
+        if pattern.endswith('/'):
+            # Pattern is intended to match directories
+            if fnmatch.fnmatch(path + '/', pattern):
+                return True
+            if fnmatch.fnmatch(path + '/', os.path.join('**', pattern)):
+                return True
+        elif pattern.endswith('/*'):
+            # Pattern is intended to match all files in a directory
+            base_pattern = pattern[:-1]  # Remove the trailing '*'
+            if fnmatch.fnmatch(path, base_pattern) or fnmatch.fnmatch(path, os.path.join('**', base_pattern)):
+                return True
+        else:
+            if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, os.path.join('**', pattern)):
+                return True
     return False
 
 def get_directory_structure(rootdir, ignore_patterns=None):
