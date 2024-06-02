@@ -1,12 +1,14 @@
 import os
 import argparse
-from utils import get_directory_structure, create_markdown_from_structure
+from utils import get_directory_structure, create_markdown_from_structure, parse_gitignore
 
 def create_markdown_for_directory(rootdir, output_file):
     """
     Creates a markdown file with the directory structure and content of all files.
     """
-    structure = get_directory_structure(rootdir)
+    gitignore_path = os.path.join(rootdir, '.gitignore')
+    ignore_patterns = parse_gitignore(gitignore_path) if os.path.exists(gitignore_path) else []
+    structure = get_directory_structure(rootdir, ignore_patterns)
     with open(output_file, 'w') as markdown_file:
         create_markdown_from_structure(structure, rootdir, markdown_file)
 
