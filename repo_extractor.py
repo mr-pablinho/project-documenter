@@ -19,23 +19,52 @@ import re
 class RepoExtractor:
     def __init__(self):
         self.files_data = []
-        self.ignored_dirs = set(['.git', '.github', 'node_modules', '__pycache__', 'venv', '.venv', 'env', '.env'])
-        self.ignored_extensions = set(['.pyc', '.pyo', '.pyd', '.so', '.dll', '.exe', '.obj', '.o', '.a', '.lib', '.zip', 
-                                     '.tar', '.gz', '.7z', '.jar', '.war', '.ear', '.class', '.log', '.bin', 
-                                     '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.mp3', '.mp4', 
-                                     '.avi', '.mov', '.flv', '.wmv', '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
-                                     '.ppt', '.pptx'])
+        # Default ignored directories
+        self.ignored_dirs = set([
+            '.git', '.github', 'node_modules', '__pycache__', 
+            'venv', '.venv', 'env', '.env', 'dist', 'build',
+            '.idea', '.vscode', '.gradle', 'target', 'bin',
+            'obj', 'out', 'ios', 'android', 'public', 'tmp'
+        ])
+        # Common binary file extensions to ignore
+        self.ignored_extensions = set([
+            '.pyc', '.pyo', '.pyd', '.so', '.dll', '.exe', '.obj', '.o', '.a', '.lib', '.zip', 
+            '.tar', '.gz', '.7z', '.jar', '.war', '.ear', '.class', '.log', '.bin', 
+            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.mp3', '.mp4', 
+            '.avi', '.mov', '.flv', '.wmv', '.pdf', '.doc', '.docx', '.xls', '.xlsx', 
+            '.ppt', '.pptx', '.db', '.sqlite', '.sqlite3', '.dat', '.min.js', '.min.css',
+            '.ttf', '.woff', '.woff2', '.eot', '.lock'
+        ])
         # Add common config for max file size (e.g., 1MB)
         self.max_file_size = 1024 * 1024  # 1MB
         # Default output format
         self.output_format = "markdown"
         
-    def scan_repository(self, repo_path):
+    def scan_repository(self, repo_path, excluded_folders=None, included_folders=None):
         """Scan repository and collect file information."""
         self.files_data = []
+        excluded_folders = excluded_folders or set()
+        included_folders = included_folders or set()
+        has_included_folders = bool(included_folders)
+        
         for root, dirs, files in os.walk(repo_path):
             # Skip ignored directories
             dirs[:] = [d for d in dirs if d not in self.ignored_dirs]
+            
+            # Skip excluded folders or only include specified folders if included_folders is set
+            rel_root = os.path.relpath(root, repo_path)
+            if rel_root == '.':
+                rel_root = ''
+                
+            # Skip this directory if it's in excluded folders
+            if any(rel_root == folder or rel_root.startswith(folder + os.path.sep) for folder in excluded_folders):
+                dirs[:] = []
+                continue
+                
+            # Skip this directory if we have included folders but this one isn't in the list
+            if has_included_folders and rel_root and not any(rel_root == folder or rel_root.startswith(folder + os.path.sep) for folder in included_folders):
+                dirs[:] = []
+                continue
             
             for file in files:
                 file_path = os.path.join(root, file)
@@ -187,6 +216,8 @@ class RepoExtractorGUI:
         self.repo_path = None
         self.output_path = None
         self.files_data = []
+        self.excluded_folders = set()
+        self.included_folders = set()
         
         self._create_ui()
     
@@ -205,6 +236,27 @@ class RepoExtractorGUI:
         ttk.Entry(repo_frame, textvariable=self.repo_path_var, width=60).grid(row=0, column=1, sticky=tk.EW, padx=5, pady=5)
         ttk.Button(repo_frame, text="Browse...", command=self._browse_repo).grid(row=0, column=2, pady=5)
         ttk.Button(repo_frame, text="Scan Repository", command=self._scan_repo).grid(row=0, column=3, padx=5, pady=5)
+        
+        # Folder inclusion/exclusion frame
+        folder_frame = ttk.LabelFrame(main_frame, text="Folder Inclusion/Exclusion", padding="10")
+        folder_frame.pack(fill=tk.X, pady=5)
+        
+        # Include folders
+        include_frame = ttk.Frame(folder_frame)
+        include_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(include_frame, text="Include Folders (comma separated):").pack(side=tk.LEFT, padx=5)
+        self.include_folders_var = tk.StringVar()
+        ttk.Entry(include_frame, textvariable=self.include_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Label(include_frame, text="(empty = include all)").pack(side=tk.LEFT, padx=5)
+        
+        # Exclude folders
+        exclude_frame = ttk.Frame(folder_frame)
+        exclude_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(exclude_frame, text="Exclude Folders (comma separated):").pack(side=tk.LEFT, padx=5)
+        self.exclude_folders_var = tk.StringVar()
+        ttk.Entry(exclude_frame, textvariable=self.exclude_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # Files selection frame
         files_frame = ttk.LabelFrame(main_frame, text="Select Files to Include", padding="10")
@@ -226,8 +278,7 @@ class RepoExtractorGUI:
                                  columns=("path", "size", "selected"),
                                  show="headings",
                                  yscrollcommand=tree_scroll_y.set,
-                                 xscrollcommand=tree_scroll_x.set
-                                 )
+                                 xscrollcommand=tree_scroll_x.set)
         
         self.tree.heading("path", text="File Path")
         self.tree.heading("size", text="Size (KB)")
@@ -337,14 +388,38 @@ class RepoExtractorGUI:
             messagebox.showerror("Error", "The selected path is not a valid directory.")
             return
         
+        # Process include/exclude folders
+        excluded_folders = set()
+        included_folders = set()
+        
+        if self.exclude_folders_var.get().strip():
+            excluded_folders = {folder.strip() for folder in self.exclude_folders_var.get().split(',') if folder.strip()}
+        
+        if self.include_folders_var.get().strip():
+            included_folders = {folder.strip() for folder in self.include_folders_var.get().split(',') if folder.strip()}
+        
+        self.excluded_folders = excluded_folders
+        self.included_folders = included_folders
+        
         self.status_var.set("Scanning repository...")
         self.root.update_idletasks()
         
         try:
-            self.files_data = self.repo_extractor.scan_repository(repo_path)
+            self.files_data = self.repo_extractor.scan_repository(
+                repo_path, 
+                excluded_folders=excluded_folders,
+                included_folders=included_folders
+            )
             self._update_tree()
             
-            self.status_var.set(f"Found {len(self.files_data)} files in repository.")
+            # Show info about included/excluded folders in status
+            status_msg = f"Found {len(self.files_data)} files in repository."
+            if excluded_folders:
+                status_msg += f" (Excluded {len(excluded_folders)} folders)"
+            if included_folders:
+                status_msg += f" (Limited to {len(included_folders)} folders)"
+            
+            self.status_var.set(status_msg)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to scan repository: {str(e)}")
             self.status_var.set("Ready")
@@ -472,6 +547,8 @@ def main():
                         help="Output format (default: markdown)")
     parser.add_argument("--include", help="Comma-separated list of file patterns to include")
     parser.add_argument("--exclude", help="Comma-separated list of file patterns to exclude")
+    parser.add_argument("--include-folders", help="Comma-separated list of folders to include (empty = include all)")
+    parser.add_argument("--exclude-folders", help="Comma-separated list of folders to exclude")
     
     args = parser.parse_args()
     
@@ -493,10 +570,26 @@ def main():
         # Set output format
         extractor.output_format = args.format
         
-        # Scan repository
-        files_data = extractor.scan_repository(args.repo)
+        # Process include/exclude folders
+        excluded_folders = set()
+        included_folders = set()
         
-        # Filter files if patterns are specified
+        if args.exclude_folders:
+            excluded_folders = {folder.strip() for folder in args.exclude_folders.split(',') if folder.strip()}
+            print(f"Excluding folders: {', '.join(excluded_folders)}")
+            
+        if args.include_folders:
+            included_folders = {folder.strip() for folder in args.include_folders.split(',') if folder.strip()}
+            print(f"Including only folders: {', '.join(included_folders)}")
+        
+        # Scan repository with folder filters
+        files_data = extractor.scan_repository(
+            args.repo,
+            excluded_folders=excluded_folders,
+            included_folders=included_folders
+        )
+        
+        # Filter files by patterns if specified
         if args.include:
             include_patterns = [re.compile(pattern) for pattern in args.include.split(',')]
             files_data = [f for f in files_data 
