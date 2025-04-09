@@ -40,29 +40,22 @@ class RepoExtractor:
         # Default output format
         self.output_format = "markdown"
         
-    def scan_repository(self, repo_path, excluded_folders=None, included_folders=None):
+    def scan_repository(self, repo_path, excluded_folders=None):
         """Scan repository and collect file information."""
         self.files_data = []
         excluded_folders = excluded_folders or set()
-        included_folders = included_folders or set()
-        has_included_folders = bool(included_folders)
         
         for root, dirs, files in os.walk(repo_path):
             # Skip ignored directories
             dirs[:] = [d for d in dirs if d not in self.ignored_dirs]
             
-            # Skip excluded folders or only include specified folders if included_folders is set
+            # Skip excluded folders
             rel_root = os.path.relpath(root, repo_path)
             if rel_root == '.':
                 rel_root = ''
                 
             # Skip this directory if it's in excluded folders
             if any(rel_root == folder or rel_root.startswith(folder + os.path.sep) for folder in excluded_folders):
-                dirs[:] = []
-                continue
-                
-            # Skip this directory if we have included folders but this one isn't in the list
-            if has_included_folders and rel_root and not any(rel_root == folder or rel_root.startswith(folder + os.path.sep) for folder in included_folders):
                 dirs[:] = []
                 continue
             
@@ -217,7 +210,6 @@ class RepoExtractorGUI:
         self.output_path = None
         self.files_data = []
         self.excluded_folders = set()
-        self.included_folders = set()
         
         self._create_ui()
     
@@ -237,18 +229,9 @@ class RepoExtractorGUI:
         ttk.Button(repo_frame, text="Browse...", command=self._browse_repo).grid(row=0, column=2, pady=5)
         ttk.Button(repo_frame, text="Scan Repository", command=self._scan_repo).grid(row=0, column=3, padx=5, pady=5)
         
-        # Folder inclusion/exclusion frame
-        folder_frame = ttk.LabelFrame(main_frame, text="Folder Inclusion/Exclusion", padding="10")
+        # Folder exclusion frame
+        folder_frame = ttk.LabelFrame(main_frame, text="Folder Exclusion", padding="10")
         folder_frame.pack(fill=tk.X, pady=5)
-        
-        # Include folders
-        include_frame = ttk.Frame(folder_frame)
-        include_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(include_frame, text="Include Folders (comma separated):").pack(side=tk.LEFT, padx=5)
-        self.include_folders_var = tk.StringVar()
-        ttk.Entry(include_frame, textvariable=self.include_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Label(include_frame, text="(empty = include all)").pack(side=tk.LEFT, padx=5)
         
         # Exclude folders
         exclude_frame = ttk.Frame(folder_frame)
@@ -259,7 +242,7 @@ class RepoExtractorGUI:
         ttk.Entry(exclude_frame, textvariable=self.exclude_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # Button to apply folder filters
-        ttk.Button(folder_frame, text="Apply Folder Filters", command=self._apply_folder_filters).pack(pady=5)
+        ttk.Button(folder_frame, text="Apply Exclusions", command=self._apply_folder_filters).pack(pady=5)
         
         # Files selection frame
         files_frame = ttk.LabelFrame(main_frame, text="Select Files to Include", padding="10")
@@ -355,11 +338,16 @@ class RepoExtractorGUI:
             self.repo_path = repo_path
             self.repo_path_var.set(repo_path)
             
-            # Suggest output file name based on repository name
+            # Suggest output file name and location based on repository
             repo_name = os.path.basename(repo_path)
             output_format = self.format_var.get()
             extension = ".md" if output_format == "markdown" else ".json" if output_format == "json" else ".txt"
-            self.output_path_var.set(os.path.join(os.path.expanduser("~"), f"{repo_name}_compendium{extension}"))
+            
+            # Create output in a compendium directory inside the repository
+            compendium_dir = os.path.join(repo_path, "compendium")
+            os.makedirs(compendium_dir, exist_ok=True)
+            
+            self.output_path_var.set(os.path.join(compendium_dir, f"{repo_name}_compendium{extension}"))
             
             # Also do an immediate scan
             self._scan_repo()
@@ -399,18 +387,13 @@ class RepoExtractorGUI:
         # Store the repository path
         self.repo_path = repo_path
         
-        # Process include/exclude folders
+        # Process exclude folders
         excluded_folders = set()
-        included_folders = set()
         
         if self.exclude_folders_var.get().strip():
             excluded_folders = {folder.strip() for folder in self.exclude_folders_var.get().split(',') if folder.strip()}
         
-        if self.include_folders_var.get().strip():
-            included_folders = {folder.strip() for folder in self.include_folders_var.get().split(',') if folder.strip()}
-        
         self.excluded_folders = excluded_folders
-        self.included_folders = included_folders
         
         self.status_var.set("Scanning repository...")
         self.root.update_idletasks()
@@ -418,17 +401,14 @@ class RepoExtractorGUI:
         try:
             self.files_data = self.repo_extractor.scan_repository(
                 repo_path, 
-                excluded_folders=excluded_folders,
-                included_folders=included_folders
+                excluded_folders=excluded_folders
             )
             self._update_tree()
             
-            # Show info about included/excluded folders in status
+            # Show info about excluded folders in status
             status_msg = f"Found {len(self.files_data)} files in repository."
             if excluded_folders:
                 status_msg += f" (Excluded {len(excluded_folders)} folders)"
-            if included_folders:
-                status_msg += f" (Limited to {len(included_folders)} folders)"
             
             self.status_var.set(status_msg)
         except Exception as e:
@@ -436,46 +416,38 @@ class RepoExtractorGUI:
             self.status_var.set("Ready")
     
     def _apply_folder_filters(self):
-        """Apply folder filters to the existing scanned repository data."""
+        """Apply folder exclusion filters to the existing scanned repository data."""
         if not self.repo_path or not self.files_data:
             messagebox.showerror("Error", "Please scan a repository first.")
             return
             
-        # Process include/exclude folders
+        # Process exclude folders
         excluded_folders = set()
-        included_folders = set()
         
         if self.exclude_folders_var.get().strip():
             excluded_folders = {folder.strip() for folder in self.exclude_folders_var.get().split(',') if folder.strip()}
         
-        if self.include_folders_var.get().strip():
-            included_folders = {folder.strip() for folder in self.include_folders_var.get().split(',') if folder.strip()}
-        
         self.excluded_folders = excluded_folders
-        self.included_folders = included_folders
         
-        self.status_var.set("Applying folder filters...")
+        self.status_var.set("Applying folder exclusions...")
         self.root.update_idletasks()
         
         try:
-            # Rescan with the new folder filters
+            # Rescan with the new folder exclusions
             self.files_data = self.repo_extractor.scan_repository(
                 self.repo_path, 
-                excluded_folders=excluded_folders,
-                included_folders=included_folders
+                excluded_folders=excluded_folders
             )
             self._update_tree()
             
-            # Show info about included/excluded folders in status
-            status_msg = f"Applied filters: Found {len(self.files_data)} files in repository."
+            # Show info about excluded folders in status
+            status_msg = f"Applied exclusions: Found {len(self.files_data)} files in repository."
             if excluded_folders:
                 status_msg += f" (Excluded {len(excluded_folders)} folders)"
-            if included_folders:
-                status_msg += f" (Limited to {len(included_folders)} folders)"
             
             self.status_var.set(status_msg)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to apply folder filters: {str(e)}")
+            messagebox.showerror("Error", f"Failed to apply folder exclusions: {str(e)}")
             self.status_var.set("Ready")
     
     def _update_tree(self, filter_text=None):
@@ -601,7 +573,6 @@ def main():
                         help="Output format (default: markdown)")
     parser.add_argument("--include", help="Comma-separated list of file patterns to include")
     parser.add_argument("--exclude", help="Comma-separated list of file patterns to exclude")
-    parser.add_argument("--include-folders", help="Comma-separated list of folders to include (empty = include all)")
     parser.add_argument("--exclude-folders", help="Comma-separated list of folders to exclude")
     
     args = parser.parse_args()
@@ -624,23 +595,17 @@ def main():
         # Set output format
         extractor.output_format = args.format
         
-        # Process include/exclude folders
+        # Process exclude folders
         excluded_folders = set()
-        included_folders = set()
         
         if args.exclude_folders:
             excluded_folders = {folder.strip() for folder in args.exclude_folders.split(',') if folder.strip()}
             print(f"Excluding folders: {', '.join(excluded_folders)}")
-            
-        if args.include_folders:
-            included_folders = {folder.strip() for folder in args.include_folders.split(',') if folder.strip()}
-            print(f"Including only folders: {', '.join(included_folders)}")
         
-        # Scan repository with folder filters
+        # Scan repository with folder exclusions
         files_data = extractor.scan_repository(
             args.repo,
-            excluded_folders=excluded_folders,
-            included_folders=included_folders
+            excluded_folders=excluded_folders
         )
         
         # Filter files by patterns if specified
