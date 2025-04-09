@@ -210,7 +210,7 @@ class RepoExtractorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Repository Extractor for LLMs")
-        self.root.geometry("900x600")
+        self.root.geometry("900x800")
         
         self.repo_extractor = RepoExtractor()
         self.repo_path = None
@@ -257,6 +257,9 @@ class RepoExtractorGUI:
         ttk.Label(exclude_frame, text="Exclude Folders (comma separated):").pack(side=tk.LEFT, padx=5)
         self.exclude_folders_var = tk.StringVar()
         ttk.Entry(exclude_frame, textvariable=self.exclude_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Button to apply folder filters
+        ttk.Button(folder_frame, text="Apply Folder Filters", command=self._apply_folder_filters).pack(pady=5)
         
         # Files selection frame
         files_frame = ttk.LabelFrame(main_frame, text="Select Files to Include", padding="10")
@@ -354,7 +357,12 @@ class RepoExtractorGUI:
             
             # Suggest output file name based on repository name
             repo_name = os.path.basename(repo_path)
-            self.output_path_var.set(os.path.join(os.path.expanduser("~"), f"{repo_name}_compendium.md"))
+            output_format = self.format_var.get()
+            extension = ".md" if output_format == "markdown" else ".json" if output_format == "json" else ".txt"
+            self.output_path_var.set(os.path.join(os.path.expanduser("~"), f"{repo_name}_compendium{extension}"))
+            
+            # Also do an immediate scan
+            self._scan_repo()
     
     def _browse_output(self):
         """Browse for output file."""
@@ -387,6 +395,9 @@ class RepoExtractorGUI:
         if not os.path.isdir(repo_path):
             messagebox.showerror("Error", "The selected path is not a valid directory.")
             return
+        
+        # Store the repository path
+        self.repo_path = repo_path
         
         # Process include/exclude folders
         excluded_folders = set()
@@ -422,6 +433,49 @@ class RepoExtractorGUI:
             self.status_var.set(status_msg)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to scan repository: {str(e)}")
+            self.status_var.set("Ready")
+    
+    def _apply_folder_filters(self):
+        """Apply folder filters to the existing scanned repository data."""
+        if not self.repo_path or not self.files_data:
+            messagebox.showerror("Error", "Please scan a repository first.")
+            return
+            
+        # Process include/exclude folders
+        excluded_folders = set()
+        included_folders = set()
+        
+        if self.exclude_folders_var.get().strip():
+            excluded_folders = {folder.strip() for folder in self.exclude_folders_var.get().split(',') if folder.strip()}
+        
+        if self.include_folders_var.get().strip():
+            included_folders = {folder.strip() for folder in self.include_folders_var.get().split(',') if folder.strip()}
+        
+        self.excluded_folders = excluded_folders
+        self.included_folders = included_folders
+        
+        self.status_var.set("Applying folder filters...")
+        self.root.update_idletasks()
+        
+        try:
+            # Rescan with the new folder filters
+            self.files_data = self.repo_extractor.scan_repository(
+                self.repo_path, 
+                excluded_folders=excluded_folders,
+                included_folders=included_folders
+            )
+            self._update_tree()
+            
+            # Show info about included/excluded folders in status
+            status_msg = f"Applied filters: Found {len(self.files_data)} files in repository."
+            if excluded_folders:
+                status_msg += f" (Excluded {len(excluded_folders)} folders)"
+            if included_folders:
+                status_msg += f" (Limited to {len(included_folders)} folders)"
+            
+            self.status_var.set(status_msg)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply folder filters: {str(e)}")
             self.status_var.set("Ready")
     
     def _update_tree(self, filter_text=None):
@@ -610,7 +664,7 @@ def main():
         extractor.save_output(output_content, args.output)
         
         print(f"Compendium generated successfully at {args.output}")
-
+        
 
 if __name__ == "__main__":
     main()
