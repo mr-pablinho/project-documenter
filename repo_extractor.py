@@ -203,7 +203,11 @@ class RepoExtractorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Repository Extractor for LLMs")
-        self.root.geometry("900x800")
+        self.root.geometry("960x800")
+        
+        # Configure root grid to properly expand
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
         
         self.repo_extractor = RepoExtractor()
         self.repo_path = None
@@ -211,126 +215,192 @@ class RepoExtractorGUI:
         self.files_data = []
         self.excluded_folders = set()
         
+        # Create theme configuration for consistency
+        style = ttk.Style()
+        style.configure("TButton", padding=5)
+        style.configure("TFrame", padding=5)
+        style.configure("TLabelframe", padding=8)
+        style.configure("TLabelframe.Label", font=("Helvetica", 10, "bold"))
+        
         self._create_ui()
     
     def _create_ui(self):
         """Create the user interface."""
-        # Main frame
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # Main container frame with padding
+        main_container = ttk.Frame(self.root, padding=10)
+        main_container.grid(row=0, column=0, sticky="nsew")
+        main_container.columnconfigure(0, weight=1)
+        
+        current_row = 0
         
         # Repository selection frame
-        repo_frame = ttk.LabelFrame(main_frame, text="Repository Selection", padding="10")
-        repo_frame.pack(fill=tk.X, pady=5)
+        repo_frame = ttk.LabelFrame(main_container, text="Repository Selection", padding=10)
+        repo_frame.grid(row=current_row, column=0, sticky="ew", pady=(0, 10))
+        repo_frame.columnconfigure(1, weight=1)
         
         self.repo_path_var = tk.StringVar()
-        ttk.Label(repo_frame, text="Repository Path:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(repo_frame, textvariable=self.repo_path_var, width=60).grid(row=0, column=1, sticky=tk.EW, padx=5, pady=5)
-        ttk.Button(repo_frame, text="Browse...", command=self._browse_repo).grid(row=0, column=2, pady=5)
-        ttk.Button(repo_frame, text="Scan Repository", command=self._scan_repo).grid(row=0, column=3, padx=5, pady=5)
+        ttk.Label(repo_frame, text="Repository Path:").grid(row=0, column=0, sticky="w", padx=(0, 5), pady=5)
+        ttk.Entry(repo_frame, textvariable=self.repo_path_var, width=60).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        
+        # Button frame for repository actions (aligned right)
+        repo_btn_frame = ttk.Frame(repo_frame)
+        repo_btn_frame.grid(row=0, column=2, sticky="e", padx=(5, 0), pady=5)
+        ttk.Button(repo_btn_frame, text="Browse...", command=self._browse_repo).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(repo_btn_frame, text="Scan Repository", command=self._scan_repo).pack(side=tk.LEFT)
+        
+        current_row += 1
         
         # Folder exclusion frame
-        folder_frame = ttk.LabelFrame(main_frame, text="Folder Exclusion", padding="10")
-        folder_frame.pack(fill=tk.X, pady=5)
+        folder_frame = ttk.LabelFrame(main_container, text="Folder Exclusion", padding=10)
+        folder_frame.grid(row=current_row, column=0, sticky="ew", pady=(0, 10))
+        folder_frame.columnconfigure(1, weight=1)
         
         # Exclude folders
-        exclude_frame = ttk.Frame(folder_frame)
-        exclude_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(exclude_frame, text="Exclude Folders (comma separated):").pack(side=tk.LEFT, padx=5)
+        ttk.Label(folder_frame, text="Exclude Folders:").grid(row=0, column=0, sticky="w", padx=(0, 5), pady=5)
         self.exclude_folders_var = tk.StringVar()
-        ttk.Entry(exclude_frame, textvariable=self.exclude_folders_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Entry(folder_frame, textvariable=self.exclude_folders_var, width=50).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        ttk.Label(folder_frame, text="(comma separated)").grid(row=0, column=2, sticky="w", padx=(0, 5), pady=5)
+        ttk.Button(folder_frame, text="Apply Exclusions", command=self._apply_folder_filters).grid(row=0, column=3, padx=(5, 0), pady=5)
         
-        # Button to apply folder filters
-        ttk.Button(folder_frame, text="Apply Exclusions", command=self._apply_folder_filters).pack(pady=5)
+        current_row += 1
         
-        # Files selection frame
-        files_frame = ttk.LabelFrame(main_frame, text="Select Files to Include", padding="10")
-        files_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        # Files selection frame - with the most space allocation
+        files_frame = ttk.LabelFrame(main_container, text="Select Files to Include", padding=10)
+        files_frame.grid(row=current_row, column=0, sticky="nsew", pady=(0, 10))
         
-        # Files treeview with scrollbars
+        # Configure files frame to expand
+        files_frame.columnconfigure(0, weight=1)
+        files_frame.rowconfigure(1, weight=1)
+        main_container.rowconfigure(current_row, weight=1)
+        
+        # Control buttons and filter at the top of files frame
+        controls_frame = ttk.Frame(files_frame)
+        controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
+        controls_frame.columnconfigure(1, weight=1)
+        
+        # File selection buttons
+        btn_frame = ttk.Frame(controls_frame)
+        btn_frame.grid(row=0, column=0, sticky="w")
+        ttk.Button(btn_frame, text="Select All", command=self._select_all).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Deselect All", command=self._deselect_all).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Toggle Selected", command=self._toggle_selected).pack(side=tk.LEFT)
+        
+        # Filter frame (aligned right)
+        filter_frame = ttk.Frame(controls_frame)
+        filter_frame.grid(row=0, column=1, sticky="e")
+        
+        ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=(0, 5))
+        self.filter_var = tk.StringVar()
+        self.filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_var, width=30)
+        self.filter_entry.pack(side=tk.LEFT, padx=(0, 5))
+        self.filter_entry.bind("<KeyRelease>", self._apply_filter)
+        
+        filter_btn_frame = ttk.Frame(filter_frame)
+        filter_btn_frame.pack(side=tk.LEFT)
+        ttk.Button(filter_btn_frame, text="Apply", command=self._apply_filter).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(filter_btn_frame, text="Clear", command=self._clear_filter).pack(side=tk.LEFT)
+        
+        # Files treeview with scrollbars inside a frame
         self.tree_frame = ttk.Frame(files_frame)
-        self.tree_frame.pack(fill=tk.BOTH, expand=True)
+        self.tree_frame.grid(row=1, column=0, sticky="nsew")
+        self.tree_frame.columnconfigure(0, weight=1)
+        self.tree_frame.rowconfigure(0, weight=1)
         
         # Scrollbars
-        tree_scroll_y = ttk.Scrollbar(self.tree_frame)
-        tree_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree_scroll_y = ttk.Scrollbar(self.tree_frame, orient=tk.VERTICAL)
+        tree_scroll_y.grid(row=0, column=1, sticky="ns")
         
         tree_scroll_x = ttk.Scrollbar(self.tree_frame, orient=tk.HORIZONTAL)
-        tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
+        tree_scroll_x.grid(row=1, column=0, sticky="ew")
         
-        # Treeview for files
+        # Treeview for files with modern appearance
         self.tree = ttk.Treeview(self.tree_frame, 
-                                 columns=("path", "size", "selected"),
-                                 show="headings",
-                                 yscrollcommand=tree_scroll_y.set,
-                                 xscrollcommand=tree_scroll_x.set)
+                                columns=("path", "size", "selected"),
+                                show="headings",
+                                yscrollcommand=tree_scroll_y.set,
+                                xscrollcommand=tree_scroll_x.set)
         
         self.tree.heading("path", text="File Path")
         self.tree.heading("size", text="Size (KB)")
         self.tree.heading("selected", text="Selected")
         
-        self.tree.column("path", width=500, stretch=tk.YES)
+        self.tree.column("path", width=550, stretch=tk.YES)
         self.tree.column("size", width=100, anchor=tk.E)
         self.tree.column("selected", width=100, anchor=tk.CENTER)
         
-        self.tree.pack(fill=tk.BOTH, expand=True)
+        self.tree.grid(row=0, column=0, sticky="nsew")
         
         tree_scroll_y.config(command=self.tree.yview)
         tree_scroll_x.config(command=self.tree.xview)
         
-        # File selection buttons
-        btn_frame = ttk.Frame(files_frame)
-        btn_frame.pack(fill=tk.X, pady=5)
+        current_row += 1
         
-        ttk.Button(btn_frame, text="Select All", command=self._select_all).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Deselect All", command=self._deselect_all).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Toggle Selected", command=self._toggle_selected).pack(side=tk.LEFT, padx=5)
-        
-        # Filter frame
-        filter_frame = ttk.Frame(files_frame)
-        filter_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(filter_frame, text="Filter:").pack(side=tk.LEFT, padx=5)
-        self.filter_var = tk.StringVar()
-        self.filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_var, width=40)
-        self.filter_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-        self.filter_entry.bind("<KeyRelease>", self._apply_filter)
-        
-        ttk.Button(filter_frame, text="Apply Filter", command=self._apply_filter).pack(side=tk.LEFT, padx=5)
-        ttk.Button(filter_frame, text="Clear Filter", command=self._clear_filter).pack(side=tk.LEFT, padx=5)
+        # Output configuration frame
+        output_config_frame = ttk.Frame(main_container)
+        output_config_frame.grid(row=current_row, column=0, sticky="ew", pady=(0, 10))
+        output_config_frame.columnconfigure(1, weight=1)
         
         # Output format selection
-        format_frame = ttk.Frame(main_frame)
-        format_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(format_frame, text="Output Format:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(output_config_frame, text="Output Format:").grid(row=0, column=0, sticky="w", padx=(0, 5), pady=5)
         self.format_var = tk.StringVar(value="markdown")
-        format_combo = ttk.Combobox(format_frame, textvariable=self.format_var, 
-                                    values=["markdown", "json", "plain"],
-                                    state="readonly", width=15)
-        format_combo.pack(side=tk.LEFT, padx=5)
+        format_combo = ttk.Combobox(output_config_frame, textvariable=self.format_var, 
+                                   values=["markdown", "json", "plain"],
+                                   state="readonly", width=15)
+        format_combo.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        
+        current_row += 1
         
         # Output selection frame
-        output_frame = ttk.LabelFrame(main_frame, text="Output Selection", padding="10")
-        output_frame.pack(fill=tk.X, pady=5)
+        output_frame = ttk.LabelFrame(main_container, text="Output Selection", padding=10)
+        output_frame.grid(row=current_row, column=0, sticky="ew", pady=(0, 10))
+        output_frame.columnconfigure(1, weight=1)
         
         self.output_path_var = tk.StringVar()
-        ttk.Label(output_frame, text="Output File:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(output_frame, textvariable=self.output_path_var, width=60).grid(row=0, column=1, sticky=tk.EW, padx=5, pady=5)
-        ttk.Button(output_frame, text="Browse...", command=self._browse_output).grid(row=0, column=2, pady=5)
+        ttk.Label(output_frame, text="Output File:").grid(row=0, column=0, sticky="w", padx=(0, 5), pady=5)
+        ttk.Entry(output_frame, textvariable=self.output_path_var, width=60).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        ttk.Button(output_frame, text="Browse...", command=self._browse_output).grid(row=0, column=2, sticky="e", padx=(5, 0), pady=5)
         
-        # Generate button
-        ttk.Button(main_frame, text="Generate LLM Compendium", command=self._generate_output).pack(pady=10)
+        current_row += 1
         
-        # Status bar
+        # Generate button (centered)
+        generate_frame = ttk.Frame(main_container)
+        generate_frame.grid(row=current_row, column=0, pady=10)
+        
+        generate_btn = ttk.Button(generate_frame, text="Generate LLM Compendium", command=self._generate_output)
+        generate_btn.configure(style="Generate.TButton")
+        # Configure a special style for the generate button
+        style = ttk.Style()
+        style.configure("Generate.TButton", font=("Helvetica", 11, "bold"))
+        generate_btn.pack(pady=5, ipady=5, ipadx=10)
+        
+        # Status bar at the bottom of the window
         self.status_var = tk.StringVar(value="Ready")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=(5, 2))
+        status_bar.grid(row=1, column=0, sticky="ew")
         
         # Bind double-click to toggle selection
         self.tree.bind("<Double-1>", self._toggle_item)
+        
+        # Bind format change to update output file extension
+        format_combo.bind("<<ComboboxSelected>>", self._update_output_extension)
     
+    def _update_output_extension(self, event=None):
+        """Update the output file extension when format changes."""
+        current_output = self.output_path_var.get()
+        if not current_output:
+            return
+            
+        # Get new extension based on format
+        format_type = self.format_var.get()
+        new_ext = ".md" if format_type == "markdown" else ".json" if format_type == "json" else ".txt"
+        
+        # Replace extension in current path
+        path_without_ext = os.path.splitext(current_output)[0]
+        new_path = path_without_ext + new_ext
+        
+        self.output_path_var.set(new_path)
+    
+    # The rest of your methods remain unchanged
     def _browse_repo(self):
         """Browse for repository directory."""
         repo_path = filedialog.askdirectory(title="Select Repository Directory")
@@ -560,7 +630,7 @@ class RepoExtractorGUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to generate compendium: {str(e)}")
             self.status_var.set("Ready")
-
+            
 
 def main():
     """Main entry point for the application."""
