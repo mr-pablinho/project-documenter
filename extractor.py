@@ -37,15 +37,12 @@ class RepoExtractor:
         excluded_folders = excluded_folders or set()
         
         for root, dirs, files in os.walk(repo_path):
-            # Skip ignored directories
             dirs[:] = [d for d in dirs if d not in self.ignored_dirs]
             
-            # Skip excluded folders
             rel_root = os.path.relpath(root, repo_path)
             if rel_root == '.':
                 rel_root = ''
                 
-            # Skip this directory if it's in excluded folders
             if any(rel_root == folder or rel_root.startswith(folder + os.path.sep) for folder in excluded_folders):
                 dirs[:] = []
                 continue
@@ -54,29 +51,24 @@ class RepoExtractor:
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
                 
-                # Skip files with ignored extensions
                 _, ext = os.path.splitext(file)
                 if ext.lower() in self.ignored_extensions:
                     continue
                 
-                # Skip files that are too large
                 try:
                     file_size = os.path.getsize(file_path)
                     if file_size > self.max_file_size:
                         continue
                         
-                    # Try to detect if it's a text file
                     if is_text_file(file_path):
                         self.files_data.append({
                             'path': rel_path,
                             'size': file_size,
-                            'selected': True  # Default to selected
+                            'selected': True 
                         })
                 except (PermissionError, OSError):
-                    # Skip files we can't access
                     continue
         
-        # Sort files by path for better organization
         self.files_data.sort(key=lambda x: x['path'])
         return self.files_data
     
@@ -128,13 +120,12 @@ class RepoExtractor:
         elif format_type == "plain":
             return self._format_plain(contents)
         else:
-            return self._format_markdown(contents)  # Default to markdown
+            return self._format_markdown(contents)
     
     def _format_markdown(self, contents):
         """Format content as markdown."""
         result = "# Repository Code Compendium\n\n"
         
-        # Group files by directory
         files_by_dir = {}
         for file_data in contents:
             path = file_data['path']
@@ -143,21 +134,18 @@ class RepoExtractor:
                 files_by_dir[directory] = []
             files_by_dir[directory].append(file_data)
         
-        # Process each directory
         for directory in sorted(files_by_dir.keys()):
             if directory:
                 result += f"## Directory: {directory}\n\n"
             else:
                 result += "## Root Directory\n\n"
             
-            # Process files in this directory
             for file_data in sorted(files_by_dir[directory], key=lambda x: x['path']):
                 file_name = os.path.basename(file_data['path'])
                 file_ext = os.path.splitext(file_name)[1].lstrip('.')
                 
                 result += f"### File: {file_data['path']}\n\n"
                 
-                # Use appropriate language for syntax highlighting if possible
                 lang = file_ext if file_ext else ""
                 result += f"```{lang}\n{file_data['content']}\n```\n\n"
         

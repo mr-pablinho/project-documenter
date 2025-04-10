@@ -14,7 +14,6 @@ from gui import RepoExtractorGUI
 
 def main():
     """Main entry point for the application."""
-    # Parse command line arguments
     parser = argparse.ArgumentParser(description="Extract code from a repository for LLM consumption.")
     parser.add_argument("--no-gui", action="store_true", help="Run in command-line mode (no GUI)")
     parser.add_argument("--repo", help="Repository path")
@@ -27,13 +26,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Run in GUI mode by default
     if not args.no_gui:
         root = tk.Tk()
         app = RepoExtractorGUI(root)
         root.mainloop()
     else:
-        # Command-line mode
         if not args.repo or not args.output:
             print("Error: --repo and --output are required in command-line mode.")
             parser.print_help()
@@ -42,23 +39,19 @@ def main():
         print(f"Scanning repository: {args.repo}")
         extractor = RepoExtractor()
         
-        # Set output format
         extractor.output_format = args.format
         
-        # Process exclude folders
         excluded_folders = set()
         
         if args.exclude_folders:
             excluded_folders = {folder.strip() for folder in args.exclude_folders.split(',') if folder.strip()}
             print(f"Excluding folders: {', '.join(excluded_folders)}")
         
-        # Scan repository with folder exclusions
         files_data = extractor.scan_repository(
             args.repo,
             excluded_folders=excluded_folders
         )
         
-        # Filter files by patterns if specified
         if args.include:
             include_patterns = [re.compile(pattern) for pattern in args.include.split(',')]
             files_data = [f for f in files_data 
@@ -71,10 +64,8 @@ def main():
         
         print(f"Found {len(files_data)} files matching criteria.")
         
-        # Extract content
         contents = extractor.extract_files_content(args.repo, files_data)
         
-        # Format and save output
         output_content = extractor.format_output(contents, args.format)
         extractor.save_output(output_content, args.output)
         
