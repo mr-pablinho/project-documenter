@@ -25,12 +25,24 @@ class RepoExtractorGUI:
         self.files_data = []
         self.excluded_folders = set()
         
+        # Define application font - same font for all components
+        self.app_font = ("Arial", 10)
+        
+        # Apply font to root to cascade to standard widgets
+        self.root.option_add("*Font", self.app_font)
+        
         # Create theme configuration for consistency
         style = ttk.Style()
-        style.configure("TButton", padding=5)
+        style.configure(".", font=self.app_font)  # Default font for all ttk widgets
+        style.configure("TButton", padding=5, font=self.app_font)
         style.configure("TFrame", padding=5)
         style.configure("TLabelframe", padding=8)
-        style.configure("TLabelframe.Label", font=("Helvetica", 10, "bold"))
+        style.configure("TLabelframe.Label", font=self.app_font)
+        style.configure("Treeview", font=self.app_font)
+        style.configure("Treeview.Heading", font=self.app_font)
+        style.configure("TLabel", font=self.app_font)
+        style.configure("TEntry", font=self.app_font)
+        style.configure("TCombobox", font=self.app_font)
         
         self._create_ui()
     
@@ -176,16 +188,15 @@ class RepoExtractorGUI:
         generate_frame = ttk.Frame(main_container)
         generate_frame.grid(row=current_row, column=0, pady=10)
         
-        generate_btn = ttk.Button(generate_frame, text="Generate LLM Compendium", command=self._generate_output)
-        generate_btn.configure(style="Generate.TButton")
-        # Configure a special style for the generate button
-        style = ttk.Style()
-        style.configure("Generate.TButton", font=("Helvetica", 11, "bold"))
+        generate_btn = ttk.Button(generate_frame, text="Generate LLM Compendium", 
+                               command=self._generate_output)
+        # Add some padding to make the button more prominent without changing the font
         generate_btn.pack(pady=5, ipady=5, ipadx=10)
         
         # Status bar at the bottom of the window
         self.status_var = tk.StringVar(value="Ready")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, padding=(5, 2))
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, 
+                              anchor=tk.W, padding=(5, 2))
         status_bar.grid(row=1, column=0, sticky="ew")
         
         # Bind double-click to toggle selection
