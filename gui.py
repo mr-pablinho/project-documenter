@@ -25,7 +25,7 @@ class RepoExtractorGUI:
         self.files_data = []
         self.excluded_folders = set()
 
-        self.app_font = ("TkDefaultFont", 9, "normal")
+        self.app_font = ("TkDefaultFont")
 
         self.root.option_add("*Font", self.app_font)
 
