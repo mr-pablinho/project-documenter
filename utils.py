@@ -20,7 +20,8 @@ DEFAULT_IGNORED_EXTENSIONS = {
     '.bin', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.mp3',
     '.mp4', '.avi', '.mov', '.flv', '.wmv', '.pdf', '.doc', '.docx', '.xls', 
     '.xlsx', '.ppt', '.pptx', '.db', '.sqlite', '.sqlite3', '.dat', '.min.js', 
-    '.min.css', '.ttf', '.woff', '.woff2', '.eot', '.lock'
+    '.min.css', '.ttf', '.woff', '.woff2', '.eot', '.lock', '.gitignore',
+    '.gitkeep', '.DS_Store'
 }
 
 DEFAULT_MAX_FILE_SIZE = 1024 * 1024
